@@ -1,0 +1,110 @@
+package admin
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strings"
+
+	"github.com/bwmarrin/discordgo"
+	"../../factorio"
+	"../../glob"
+	"../../support"
+)
+
+func Addmod(s *discordgo.Session, m *discordgo.MessageCreate, args []string, channel string) {
+	numargs := len(args)
+	if numargs < 1 {
+		s.ChannelMessageSend(channel, "...okay but what mod do you want to add?")
+		return
+	}
+	argstring := strings.Join(args[1:], "%20")
+	escapedargs, _ := url.PathUnescape(argstring)
+	escapedargs = strings.ReplaceAll(escapedargs, "https://mods.factorio.com/mod/", "")
+	cleanurl := &url.URL{Path: escapedargs}
+	cleanedargs := cleanurl.String()
+
+	modurl := fmt.Sprintf("https://mods.factorio.com/api/mods?page_size=1000000&full=True&namelist=%s", cleanedargs)
+	if glob.XDEBUG {
+		support.Log("Requesting ", modurl)
+	}
+	resp, err := http.Get(modurl)
+	if err != nil {
+		support.Log("Couldn't get URL:", modurl)
+		s.ChannelMessageSend(channel, "Factorio mod portal didn't respond.")
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	var modportalresponse string = string(body)
+	res := &glob.FactModDJSON{}
+
+	if err != nil {
+		support.ErrorLog("", err)
+	} else {
+		err := json.Unmarshal([]byte(modportalresponse), res)
+		if err != nil {
+			support.ErrorLog("json unmarshal error: ", err)
+			s.ChannelMessageSend(channel, "Something went wrong...")
+			return
+		}
+
+		if len(res.Results) == 0 {
+			support.Log("No results in json data.")
+			s.ChannelMessageSend(channel, "Couldn't find a mod called that.")
+			s.ChannelMessageSend(channel, factorio.ModSearch(cleanedargs))
+			return
+		}
+
+	}
+
+	//-- RLOCK ---
+	glob.NewsLock.RLock()
+	//-- RLOCK ---
+	for modpos := 0; modpos < glob.NewsDatabaseLen; modpos++ {
+		if glob.NewsDatabase[modpos].Name == res.Results[0].Name {
+			s.ChannelMessageSend(channel, "That mod is already in the list!")
+			return
+		}
+	}
+	//-- RUNLOCK ---
+	glob.NewsLock.RUnlock()
+	//-- RUNLOCK ---
+
+	if res.Results[0].Name != "" {
+		rel := len(res.Results[0].MPReleasess) - 1
+
+		//--- LOCK ---
+		glob.NewsLock.Lock()
+		//--- LOCK ---
+
+		//Check length while locked
+		if glob.NewsDatabaseLen < glob.ModsMax {
+			glob.NewsDatabase[glob.NewsDatabaseLen].Name = res.Results[0].Name
+			glob.NewsDatabase[glob.NewsDatabaseLen].Title = res.Results[0].Title
+			glob.NewsDatabase[glob.NewsDatabaseLen].Version = res.Results[0].MPReleasess[rel].Version
+			glob.NewsDatabaseLen++
+		} else {
+			s.ChannelMessageSend(channel, "Sorry, we already have the max number of mods!")
+		}
+
+		//--- UNLOCK ---
+		glob.NewsLock.Unlock()
+		//--- UNLOCK ---
+
+		s.ChannelMessageSend(channel, fmt.Sprintf("Added mod: %s(%s)\n[%s]", res.Results[0].Title, res.Results[0].MPReleasess[rel].Version, res.Results[0].Name))
+
+		//Mark as dirty
+		glob.NewsDBDirtyLock.Lock()
+		glob.NewsDBDirty = true
+		glob.NewsDBDirtyLock.Unlock()
+
+	} else {
+		s.ChannelMessageSend(channel, "Couldn't find a mod called that.")
+		s.ChannelMessageSend(channel, factorio.ModSearch(cleanedargs))
+	}
+	return
+}

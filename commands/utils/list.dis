@@ -1,0 +1,36 @@
+package utils
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/bwmarrin/discordgo"
+	"../../glob"
+)
+
+func Listmods(s *discordgo.Session, m *discordgo.MessageCreate, args []string, channel string) {
+
+	diff := time.Now().Sub(glob.LastNewsRefresh)
+	buffer := fmt.Sprintf("```Mods we are monitoring: (last refresh %s ago)\n", diff.Round(time.Second))
+
+	//--- RLOCK ---
+	glob.NewsLock.RLock()
+	//--- RLOCK ---
+	for pos := 0; pos < glob.NewsDatabaseLen; pos++ {
+
+		isinstalled := ""
+		if glob.NewsDatabase[pos].Enabled {
+			isinstalled = "(INSTALLED)"
+		}
+		//If we don't have title yet, use internal name.
+		//Offset position by one (count starting with 1)
+		buffer = buffer + fmt.Sprintf("%-3d :  %-30.30s : %-8.8s %s\n", pos+1, glob.NewsDatabase[pos].Name, glob.NewsDatabase[pos].Version, isinstalled)
+	}
+	//--- RUNLOCK ---
+	glob.NewsLock.RUnlock()
+	//--- RUNLOCK ---
+
+	buffer = buffer + "```"
+	s.ChannelMessageSend(channel, buffer)
+	return
+}

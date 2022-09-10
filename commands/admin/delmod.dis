@@ -1,0 +1,57 @@
+package admin
+
+import (
+	"fmt"
+	"net/url"
+	"strings"
+
+	"github.com/bwmarrin/discordgo"
+	"../../factorio"
+	"../../glob"
+)
+
+func Delmod(s *discordgo.Session, m *discordgo.MessageCreate, args []string, channel string) {
+	numargs := len(args)
+
+	if numargs < 1 {
+		s.ChannelMessageSend(channel, "...okay but what mod do you want to delete?")
+		return
+	}
+
+	argstring := strings.Join(args[1:], "%20")
+	escapedargs, _ := url.PathUnescape(argstring)
+	escapedargs = strings.ReplaceAll(escapedargs, "https://mods.factorio.com/mod/", "")
+
+	//--- LOCK ---
+	glob.NewsLock.Lock()
+	//--- LOCK ---
+
+	for modpos := 0; modpos < glob.NewsDatabaseLen; modpos++ {
+		if glob.NewsDatabase[modpos].Name == escapedargs {
+
+			if glob.NewsDatabase[modpos].Deleted == false {
+				s.ChannelMessageSend(channel, fmt.Sprintf("Deleting mod: %s", escapedargs))
+				glob.NewsDatabase[modpos].Deleted = true
+			} else {
+				s.ChannelMessageSend(channel, fmt.Sprintf("Undeleting mod: %s", escapedargs))
+				glob.NewsDatabase[modpos].Deleted = false
+			}
+
+			//Mark as dirty
+			glob.NewsDBDirtyLock.Lock()
+			glob.NewsDBDirty = true	
+			glob.NewsDBDirtyLock.Unlock()
+
+			//--- UNLOCK ---
+			glob.NewsLock.Unlock()
+			//--- UNLOCK ---
+			return
+		}
+	}
+	//--- UNLOCK ---
+	glob.NewsLock.Unlock()
+	//--- UNLOCK ---
+	s.ChannelMessageSend(channel, "Couldn't find a mod called that.")
+	s.ChannelMessageSend(channel, factorio.ModSearch(escapedargs))
+	return
+}

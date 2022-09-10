@@ -1,0 +1,44 @@
+# Rename me .env
+# Database locations
+FMDBFile="FMDB.dat"
+GDBFile="GDB.dat"
+
+# Log verbosity
+verbose="true"
+
+
+# Timer data kept in here, for reboot persistance
+DateStampFile="lastrefresh.dat"
+
+# Max attempts for fetching URLs
+MaxFetchAttempts=15
+
+# Multipler for each attempt
+RetryMultiplier=3
+
+TwitchURL="https://www.twitch.tv/username"
+
+# Bot token (replaces login/pass)
+DiscordToken=""
+
+# Channels Cmd is for commands, we post news to Post.
+DiscordCmdChannel=""
+DiscordPostChannel=""
+DiscordAllChannel=""
+
+# Discord Admin IDs (this needs to be replace with role permissions)
+DiscordAdminIDs=""
+
+# Command prefix, keeps us from tiggering on random conversation
+DiscordCommandPrefix="$"
+
+# These are for formatting news posts
+DiscordMaxLineLength="50"
+DiscordMaxLines="8"
+DiscordMaxTitleWords="4"
+
+# How often to check for changes
+FactModRefreshRate="30"
+
+# We need this to login to the mod portal, for mod details
+FactPlayerDataLocation="player-data.json"

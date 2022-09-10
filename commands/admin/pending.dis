@@ -1,0 +1,17 @@
+package admin
+
+import (
+	"github.com/bwmarrin/discordgo"
+)
+
+func Pending(s *discordgo.Session, m *discordgo.MessageCreate, args []string, channel string) {
+
+	//--- LOCK ---
+	//glob.NewsLock.Lock()
+	//defer glob.NewsLock.Unlock()
+	//--- LOCK ---
+	_, err := s.ChannelMessageSend(channel, "pending: Not yet implemented.")
+	if err != nil {
+		support.Log("Couldn't send message: pending command")
+	}
+}
